@@ -1,9 +1,24 @@
+# LegacyLens — Python Backend Dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Core server ───────────────────────────────────────────────────────────────
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9
 pydantic==2.9.2
 httpx==0.27.2
+python-dotenv==1.0.1
 
-# Uncomment when connecting real AI APIs:
-# openai>=1.50.0
-# anthropic>=0.34.0
+# ── AI APIs (uncomment the ones you are using) ────────────────────────────────
+
+# OpenAI — Whisper (speech-to-text), GPT-4o (story + captions), TTS
+openai>=1.50.0
+
+# Anthropic Claude — story generation (warm, empathetic writing)
+anthropic>=0.34.0
+
+# ElevenLabs — high-quality text-to-speech
+# elevenlabs>=1.0.0
+
+# Google Gemini — alternative vision model for photo captions
+# google-generativeai>=0.8.0

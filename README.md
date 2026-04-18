@@ -6,17 +6,59 @@ LegacyLens helps senior citizens capture, preserve, and share their life stories
 
 ---
 
-## Quick Start
+## Running the App
+
+You need **two terminals** open at the same time — one for the Python backend, one for the Next.js frontend.
+
+### Terminal 1 — Python FastAPI Backend
 
 ```bash
-# Install dependencies
-npm install
+cd LegacyLens-main\backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
-# Start development server
+You should see:
+```
+Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+You can also open **http://localhost:8000/docs** to see the interactive API documentation.
+
+### Terminal 2 — Next.js Frontend
+
+```bash
+cd LegacyLens-main
+npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+You should see:
+```
+Local: http://localhost:3000
+```
+
+Then open **http://localhost:3000** in your browser.
+
+---
+
+## Environment Variables
+
+### Frontend — create `LegacyLens-main\.env.local`
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Backend — create `LegacyLens-main\backend\.env`
+
+```
+OPENAI_API_KEY=paste-your-openai-key-here
+ANTHROPIC_API_KEY=paste-your-anthropic-key-here
+ELEVENLABS_API_KEY=paste-your-elevenlabs-key-here
+```
+
+> The app runs with mock data if no API keys are provided — you only need keys when connecting real AI features.
 
 ---
 
@@ -37,7 +79,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Project Structure
 
 ```
-legacylens/
+LegacyLens-main/
 ├── app/
 │   ├── page.tsx              # Landing page
 │   ├── layout.tsx            # Root layout + metadata
@@ -49,11 +91,11 @@ legacylens/
 │   ├── stories/
 │   │   ├── page.tsx          # Stories list
 │   │   └── [id]/page.tsx     # Individual story view
-│   ├── family/page.tsx       # Family portal
-│   └── api/
-│       ├── transcribe/       # Mock speech-to-text endpoint
-│       ├── generate-story/   # Mock AI story generation
-│       └── generate-caption/ # Mock AI photo captioning
+│   └── family/page.tsx       # Family portal
+├── backend/
+│   ├── main.py               # FastAPI server — all AI endpoints
+│   ├── requirements.txt      # Python dependencies
+│   └── .env.example          # API key template
 ├── components/
 │   ├── ui/
 │   │   ├── Button.tsx        # Accessible button component
@@ -70,91 +112,73 @@ legacylens/
 │       ├── PhotoUploadZone.tsx  # Drag-and-drop upload
 │       └── PhotoCard.tsx        # Photo + caption card
 ├── lib/
+│   ├── api.ts                # API helper — points to FastAPI backend
 │   ├── mock-data.ts          # Sample stories, family members, AI responses
 │   └── utils.ts              # Helper functions
+├── .env.local.example        # Frontend env template
 └── public/
     └── photos/               # Static photo assets
 ```
 
 ---
 
-## Connecting Real AI APIs
+## API Endpoints (FastAPI)
 
-### 1. Speech-to-Text (Voice Recording)
-**File:** `app/api/transcribe/route.ts`
-
-Replace mock with **OpenAI Whisper**:
-```typescript
-import OpenAI from "openai";
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const transcription = await openai.audio.transcriptions.create({
-  file: audioBlob,
-  model: "whisper-1",
-});
-```
-
-Or **Google Speech-to-Text** / **Gemini** equivalents.
-
-### 2. Story Generation
-**File:** `app/api/generate-story/route.ts`
-
-Replace mock with **Anthropic Claude** (recommended for warm, empathetic writing):
-```typescript
-import Anthropic from "@anthropic-ai/sdk";
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const message = await anthropic.messages.create({
-  model: "claude-opus-4-7",
-  max_tokens: 1500,
-  messages: [{
-    role: "user",
-    content: `Transform this memory into a polished story chapter:\n\n${transcript}`,
-  }],
-});
-```
-
-### 3. Photo Captioning
-**File:** `app/api/generate-caption/route.ts`
-
-Replace mock with **GPT-4o Vision**:
-```typescript
-const response = await openai.chat.completions.create({
-  model: "gpt-4o",
-  messages: [{
-    role: "user",
-    content: [
-      { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-      { type: "text", text: "Generate a warm, evocative title and caption for this old photo..." },
-    ],
-  }],
-});
-```
-
-### 4. Text-to-Speech (Listen button)
-**File:** `app/stories/[id]/page.tsx` — "Listen to Story" button
-
-Connect to **ElevenLabs**, **OpenAI TTS**, or browser **Web Speech API**:
-```typescript
-// Browser Web Speech API (no API key needed):
-const utterance = new SpeechSynthesisUtterance(story.fullText);
-utterance.rate = 0.85;
-speechSynthesis.speak(utterance);
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Health check |
+| `GET` | `/docs` | Interactive API docs |
+| `POST` | `/api/transcribe` | Speech-to-text (accepts audio file) |
+| `POST` | `/api/generate-story` | Generate polished story from transcript |
+| `POST` | `/api/generate-caption` | Generate title + caption for a photo |
+| `POST` | `/api/text-to-speech` | Convert story text to audio |
 
 ---
 
-## Environment Variables
+## Connecting Real AI APIs
 
-Create a `.env.local` file:
+All integration points are in `backend/main.py` with exact code comments. Here's a summary:
 
-```bash
-# OpenAI (for Whisper + GPT-4o)
-OPENAI_API_KEY=your_key_here
+### 1. Speech-to-Text — OpenAI Whisper
+```python
+import openai
+client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+transcription = await client.audio.transcriptions.create(
+    model="whisper-1",
+    file=("audio.webm", audio_bytes, "audio/webm"),
+)
+```
 
-# Anthropic Claude (for story generation)
-ANTHROPIC_API_KEY=your_key_here
+### 2. Story Generation — Anthropic Claude
+```python
+import anthropic
+client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+message = await client.messages.create(
+    model="claude-opus-4-7",
+    max_tokens=1500,
+    messages=[{"role": "user", "content": transcript}],
+)
+```
 
-# ElevenLabs (for TTS)
-ELEVENLABS_API_KEY=your_key_here
+### 3. Photo Captions — OpenAI GPT-4o Vision
+```python
+import openai, base64
+client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+b64 = base64.b64encode(image_bytes).decode()
+response = await client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+        {"type": "text", "text": "Generate a warm title and caption for this old photo."},
+    ]}],
+)
+```
+
+### 4. Text-to-Speech — OpenAI TTS
+```python
+response = await client.audio.speech.create(
+    model="tts-1", voice="nova", input=story_text
+)
 ```
 
 ---
@@ -197,11 +221,17 @@ LegacyLens is built with senior accessibility as a first-class concern:
 
 ## Built With
 
+**Frontend**
 - [Next.js 15](https://nextjs.org/) — React framework
 - [TypeScript](https://www.typescriptlang.org/) — Type safety
 - [Tailwind CSS](https://tailwindcss.com/) — Styling
 - [Lucide React](https://lucide.dev/) — Icons
-- [clsx](https://github.com/lukeed/clsx) + [tailwind-merge](https://github.com/dcastil/tailwind-merge) — Utility classes
+
+**Backend**
+- [FastAPI](https://fastapi.tiangolo.com/) — Python web framework
+- [Uvicorn](https://www.uvicorn.org/) — ASGI server
+- [Pydantic](https://docs.pydantic.dev/) — Data validation
+- [python-dotenv](https://pypi.org/project/python-dotenv/) — Environment variables
 
 ---
 
