@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Sparkles, BookOpen, ArrowRight } from "lucide-react";
+import { apiPost, apiUpload } from "@/lib/api";
 import Navbar from "@/components/layout/Navbar";
 import PageWrapper from "@/components/layout/PageWrapper";
 import Button from "@/components/ui/Button";
@@ -59,30 +60,42 @@ export default function PhotosPage() {
 
   async function generateAllCaptions() {
     setGeneratingAll(true);
-    // REAL AI INTEGRATION: Loop through photos, call POST /api/generate-caption for each
-    await new Promise((r) => setTimeout(r, 2500));
+    // Calls FastAPI backend at http://localhost:8000/api/generate-caption for each photo
+    const uncaptioned = photos.filter((p) => !p.title && !p.id.startsWith("demo"));
+    const results = await Promise.all(
+      uncaptioned.map(async (p) => {
+        const fd = new FormData();
+        fd.append("photo", p.file);
+        return apiUpload<{ title: string; caption: string }>("/api/generate-caption", fd)
+          .then((data) => ({ id: p.id, ...data }))
+          .catch(() => ({ id: p.id, title: "A Cherished Memory", caption: "This photograph holds a world." }));
+      })
+    );
     setPhotos((prev) =>
-      prev.map((p) =>
-        p.title
-          ? p
-          : {
-              ...p,
-              title: "A Cherished Memory",
-              caption:
-                "This photograph holds a world. You can almost hear the sounds of that day — the voices, the small moments of joy, the feeling of time moving gently.",
-            }
-      )
+      prev.map((p) => {
+        const result = results.find((r) => r.id === p.id);
+        return result ? { ...p, title: result.title, caption: result.caption } : p;
+      })
     );
     setGeneratingAll(false);
     setAllGenerated(true);
   }
 
   async function generatePhotoStory() {
+    const prompt = storyText || "Generate a story for this photo collection.";
     setStoryText("Generating…");
-    await new Promise((r) => setTimeout(r, 2000));
-    setStoryText(
-      `These photographs tell a story that words alone can barely hold.\n\nEach image carries within it not just a moment, but an entire world — the sounds just out of frame, the conversations happening just before and after the shutter clicked, the feeling of those particular days.\n\nLooking at them together, you see the thread that runs through all of it: the people you loved, the places that made you, the ordinary moments that became extraordinary simply because they were yours.\n\nThis is your life. And it has been, from the very beginning, a story worth telling.`
-    );
+    // Calls FastAPI backend at http://localhost:8000/api/generate-story
+    try {
+      const data = await apiPost<{ full_text: string }>("/api/generate-story", {
+        transcript: prompt,
+        follow_up_answers: photos.filter((p) => p.caption).map((p) => p.caption!),
+      });
+      setStoryText(data.full_text);
+    } catch {
+      setStoryText(
+        "These photographs tell a story that words alone can barely hold.\n\nEach image carries within it not just a moment, but an entire world — the sounds just out of frame, the conversations happening just before and after the shutter clicked.\n\nThis is your life. And it has been, from the very beginning, a story worth telling."
+      );
+    }
   }
 
   return (
