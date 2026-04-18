@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import AIFollowUp from "@/components/story/AIFollowUp";
 import WaveformVisualizer from "@/components/story/WaveformVisualizer";
+import { apiPost, apiUpload, API_BASE } from "@/lib/api";
 
 type Stage = "idle" | "recording" | "transcribing" | "followup" | "generating" | "done";
 
@@ -45,8 +46,9 @@ export default function CapturePage() {
     // });
     // const { transcript } = await response.json();
 
-    const res = await fetch("/api/transcribe", { method: "POST" });
-    const data = await res.json();
+    // Calls FastAPI backend at http://localhost:8000/api/transcribe
+    // Pass audio blob via FormData when MediaRecorder is wired up
+    const data = await apiPost<{ transcript: string }>("/api/transcribe");
     setTranscript(data.transcript);
     setStage("followup");
   }
@@ -58,13 +60,13 @@ export default function CapturePage() {
   async function generateStory() {
     setStage("generating");
 
-    const res = await fetch("/api/generate-story", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript, followUpAnswers }),
-    });
-    const data = await res.json();
-    setGeneratedStory(data.story);
+    // Calls FastAPI backend at http://localhost:8000/api/generate-story
+    const data = await apiPost<{ title: string; summary: string; full_text: string; follow_up_question: string; tags: string[]; year: string; location: string }>(
+      "/api/generate-story",
+      { transcript, follow_up_answers: followUpAnswers }
+    );
+    // FastAPI returns the story directly (no .story wrapper)
+    setGeneratedStory({ ...data, fullText: data.full_text, followUpQuestion: data.follow_up_question });
     setStage("done");
   }
 
